@@ -1,0 +1,95 @@
+<script>
+    window.document.addEventListener("message", function(event) {
+
+        var eventData = JSON.parse(event.data);
+
+        switch(eventData.id)
+        {
+            case "storagePut":
+                window.storage.put(key, value);
+                return;
+
+            case "storageGet":
+                var getData = JSON.parse(eventData.data);
+
+                if (getData)
+                {
+                    window.storage.handleGet(getData.key, getData.value);
+                }
+                return;
+        }
+        
+    }, false);
+
+    function saveToLocalStorage(){
+
+        //var code = window.crypto.getRandomBytes(8);
+        // This will return an Array Buffer, which needs to be converted to a string
+        var key = document.getElementById("key").value;
+        var value = document.getElementById("value").value;
+
+        //We don't want to save any empty values
+        if (!key || !value)
+            return;
+
+        //Call our web storage class to save our values
+        window.storage.remotePut(key, value);
+        window.document.getElementById("storageStatus").innerHTML = "Adding new code!";
+        document.getElementById("value").value = "";
+    }
+
+    function fetchCode()
+    {
+        var key = document.getElementById("key").value;
+        window.storage.remoteGet(key).then(function(result)
+        {
+            window.document.getElementById("storageStatus").innerHTML = "Results fetched from React Native AsyncStorage:";
+            document.getElementById("value").value = result;
+        }, function(error)
+        {
+            window.document.getElementById("storageStatus").innerHTML = error;
+        });
+    }
+
+    function clearInputs()
+    {
+        document.getElementById("key").value = "";
+        document.getElementById("value").value = "";
+    }
+
+</script>
+<script type="text/javascript" src="./storage.js"></script>
+
+<style>
+   .button {
+    background-color:white;
+    border: none;
+    color: black;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 30px;
+}
+</style>
+
+<body style="background:lightseagreen; display: flex; flex-direction: column;justify-content: center; text-align:center">
+    <div id="content" style="font-size: 50px; color:white">
+        Hello from the Webview!
+    </div>
+    <div style="font-size: 30px; margin-top: 20px; font-family: 'Arial'; color:lightgrey" id="storageStatus"></div>
+    <br><br>
+    <div id="inputs">
+        <div>
+            <input style="font-size: 30" id="key" type="text" placeholder="Enter your key">
+        </div>
+        <div></div>
+            <input style="font-size: 30" id="value" type="text" placeholder="Enter your value">
+        </div>
+    </div>
+    <div id="actionbuttons" style="padding:50px">
+        <button class="button" onclick="saveToLocalStorage()">Save to Local Storage</button>
+        <button class="button" onclick="fetchCode()">Fetch Code</button>
+        <button class="button" onclick="clearInputs()">Clear</button>
+    </div>
+</body>

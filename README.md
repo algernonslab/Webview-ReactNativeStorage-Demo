@@ -1,6 +1,7 @@
 # Webview-ReactNativeStorage-Demo
 How-to guide for setting up a Webview to save and retrieve from React Native AsyncStorage.
 
+<img src="./IMG_6438.PNG" width="300">
 
 ## Intro
 
@@ -41,7 +42,6 @@ Below outlines the scripts that are a part of this demo.  This is, of course, on
 ###### WebView Scripts
 - webassets/bridge.html
 - webassets/storage.js
-
 
 *Let's get to it!*
 

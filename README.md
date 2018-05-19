@@ -85,6 +85,8 @@ One thing to keep in mind is that AsyncStorage methods are as the class name sug
 In order for us to be able to use our webJS code, we need to set up App.js with a WebView and the handlers to manage sending and receiving messages.
 
 First, we want to set our imports.  In this demo, we will be using a few basic modules from the react-native library: [Stylesheet](https://facebook.github.io/react-native/docs/stylesheet.html), [Text](https://facebook.github.io/react-native/docs/text.html), [View](https://facebook.github.io/react-native/docs/view.html), [Platform](https://facebook.github.io/react-native/docs/platform-specific-code.html#platform-module), and of course, [WebView](https://facebook.github.io/react-native/docs/webview.html)!
+
+#### Imports
 ```
 import React from 'react';
 import { StyleSheet, Text, View, Platform, WebView } from 'react-native';
@@ -94,6 +96,9 @@ import Storage from './storage.js';
 ```
 
 Next, let's set up our app to render two views representing each half - the top half will be the React Native side, and the bottom half will be our Webview.
+
+#### Render View
+
 ```
 ...
 export default class App extends React.Component 
@@ -109,14 +114,14 @@ export default class App extends React.Component
           </View>
           <View style={{flex:1}}> 
             <WebView
+              ref={( webView ) => this.webView = webView}
               source={__DEV__ 
                 ? require('./webassets/bridge.html') 
                 : Platform.OS === 'ios' 
                   ? {uri:'assets/bridge.html'} 
                   : {uri: "file:///android_asset/bridge.html"}}
-              onMessage={this.onWebViewMessage}
-              ref={( webView ) => this.webView = webView}
               onLoad = {this.onWebViewLoaded}
+              onMessage={this.onWebViewMessage}
             />
           </View>
         </View>
@@ -125,8 +130,142 @@ export default class App extends React.Component
 }
 ...
 ```
-You may have noticed that in the source of our webview, there are three distinct cases - dev, ios and android.  The reason why our bridge class needs to be handled differently on each platform is because although a single HTML file is totally fine to be bundled with your Expo project, if you plan to have any included JavaScript, CSS, or any external file dependencies, relative pathing will not work.  They need to be bundled along with the mobile client as part of its assets.  
+You may have noticed that in the source of our webview, there are three distinct cases - dev, ios and android.  The reason why our bridge class needs to be handled differently on each platform is because although a single HTML file is totally fine to be bundled with your Expo project, if you plan to have any included JavaScript, CSS, or any external file dependencies, relative pathing will not work.  They need to be bundled along with the mobile client as part of its assets.  <*might need to insert some explanation here or link*>
 
 In Android, the location is `file:///android_asset/`.  On iOS, it is up to how you set up your Xcode project, but I have it under an `assets` folder.
 
 You can get around this by embedding all your CSS and JavaScript into the HTML file so no special cases are necessary, but if you have a significant amount of code to drive our WebView, you'll likely want to have the freedom of organization for your own sanity.   The drawback is that you won't be able to update your WebView content live.
+
+#### The Webview Event Handlers
+
+The WebView has a few built in events you can add callbacks to, in order to trigger certain actions.
+
+Below demonstrates when a WebView has loaded.  Handling this is optional, such as if you want to hide your React Native view until the WebView has loaded.  In this case, we are just setting a flag on the ready state.
+```
+// When the Webview has loaded
+onWebViewLoaded() {
+    this.setState({
+      isWebViewReady: true,
+    });
+}
+```
+More importantly, we want to add a handler for when a message comes through from the WebView and route it to our Storage class, which will then add or fetch things from AsyncStorage.  
+
+```
+onWebViewMessage(event) {
+
+    let msgData;
+    try 
+    {
+      // event.nativeEvent.data is the data sent from the WebView
+      msgData = JSON.parse(event.nativeEvent.data);
+    } 
+    catch (err) 
+    {
+      console.warn(err);
+      return;
+    }
+    
+    switch (msgData.targetFunc) 
+    {
+      // When the webview sends a message to add something to storage
+      case "storagePut":
+        var key = msgData.data.key;
+        var value = msgData.data.value;
+        
+        this.storage.setItem(key, value).then((res) => {
+          this.setState({webviewActivityMessage: "Webview storage request received!", key: key, value: value});
+        });
+        break;
+
+      // When the webview sends a message to fetch something from storage
+      case "storageGet":
+        var key = msgData.data.key;
+        
+        this.storage.getItem(key).then((res) => {
+          this.sendWebviewPostMessage("storageGet", JSON.stringify({key: key, value: res}));
+        });
+        break;
+    }
+    }
+}
+```
+Practice: The "remove" action is missing from the switch above - add an implementation of it that calls the method in Storage.js.
+
+## Step 3 - Creating The Bridge
+
+Now that we've laid down the groundwork on the React Native side, it's time to set up a magic bridge that will grant a humble Webview the ability to save its data to local, native storage (OK, it's not really magic).
+
+### Webview's Storage (storage.js)
+
+Before we dive into the meat of it, let's get a simple storage class set up, that will mirror what we have on the React Native side, but will serve as kind of the "API" to React Native.  Here we will "post" requests to React Native with our storage requests.
+
+```
+...
+remotePut: function(key, value) {
+    if (value === undefined)
+        throw new Error("Tried to store undefined");
+
+    //----------------------------------------------------------------
+    // Why can't we just call localStorage from the webview side??
+    //localStorage.setItem("" + key, textsecure.utils.jsonThing(value));
+    //----------------------------------------------------------------
+
+    var msgObj = 
+    {
+        targetFunc: "storagePut",
+        data: {key: key, value: value}
+    };
+
+    var msg = JSON.stringify(msgObj);
+
+    // Second parameter is target origin, used for security measures to only send from a certain window
+    window.postMessage(msg, '*');
+},
+...
+```
+
+A few things to note here, the first thing we just want to get out of the way:
+
+#### 1. Why can't we just use localStorage as in regular WebJS??
+window.localStorage is still very much a thing, and can be something you make use of *as long as you only need it during the current session*.  If you require access to the keys and values in a subsequent session, the data will no longer be accessible.  <*might need to insert some explanation here or link*>
+
+#### 2. Calling `window.postMessage` will take care of sending your message to the React Native side.
+The object you use to wrap your data to fire over the bridge is up your imagination, as long as it can be sent as a string.  The first parameter is your stringified object data, and the second parameter is a mandatory field to specify where the message is originating from, in order to allow for validating on the receiving end and protect against malicious attacks.  In this case `'*'` is a wildcard key, meaning it's coming from a generic/unspecified location.  It will be up to the receiver to decide if the message is acceptable or not.
+
+```
+remoteGet: function(key) {
+    var msgObj = 
+    {
+        targetFunc: "storageGet",
+        data: {key: key}
+    };
+
+    var msg = JSON.stringify(msgObj);
+
+    window.postMessage(msg, '*');
+
+    return new Promise(function(resolve, reject) { 
+        window.fetchPromiseSwitchboard[key] = {resolve: resolve, reject: reject};
+    });
+},
+```
+
+`remoteGet` follows the same pattern as `remotePut`, with one marked difference - it returns a Promise, which stores its resolve and reject callbacks to something called the `window.fetchPromiseSwitchboard`.  What the heck is that?
+
+#### FetchPromiseSwitchboard
+The Fetch Promise Switchboard is where key requests are mapped to response callbacks.  Why do we need this?  Because the action of contacting React Native, asking them to do a look up of our key in AsyncStorage, and catching the value on the return is a fire-and-receive-later kind of operation.  There is no convenient callback we can hook into, like an actual API with a response.  The WebView event model follows a Broadcast pattern.  Therefore, when we post a message with our fetch request, the response will be returning through a different event.  And when the fetch successfully returns, we need some way to associate the key that was fetched by React Native with "resolve" and "reject" callbacks established during the original call.
+
+As an analogy, think of applying for a new passport.  The first visit to the Passport Office will be you filling out forms, and documents, and then you're told you will receive your passport at a later date.  You pass on your contact info, like your home address.  When the passport is ready, the officer will match your passport to the address details you left, and mail out your passport to you.  So when you receive it days later, you will be all fine and dandy for the next getaway to Bali.
+
+```
+ handleGet: function(key, value)
+    {
+        if ( window.fetchPromiseSwitchboard[key] && window.fetchPromiseSwitchboard[key].resolve)
+        {
+            window.fetchPromiseSwitchboard[key].resolve(value);
+            delete window.fetchPromiseSwitchboard[key];
+        }
+    },
+```
+`handleGet` is the passport officer doing the lookup of your address to pass on your new shiny passport.  It checks if the key matches any of the switchboard requests made previously, as it's not at all unfeasible to imagine someone else applying to get their passport at the same time as you.  You won't know when theirs is ready, even if you already know yours - everyone is closely tied to their accounts.

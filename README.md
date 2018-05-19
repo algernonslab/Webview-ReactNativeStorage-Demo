@@ -130,7 +130,8 @@ export default class App extends React.Component
 }
 ...
 ```
-You may have noticed that in the source of our webview, there are three distinct cases - dev, ios and android.  The reason why our bridge class needs to be handled differently on each platform is because although a single HTML file is totally fine to be bundled with your Expo project, if you plan to have any included JavaScript, CSS, or any external file dependencies, relative pathing will not work.  They need to be bundled along with the mobile client as part of its assets.  <*might need to insert some explanation here or link*>
+You may have noticed that in the source of our webview, there are three distinct cases - dev, ios and android.  The reason why our bridge class needs to be handled differently on each platform is because although a single HTML file is totally fine to be bundled with your Expo project, if you plan to have any included JavaScript, CSS, or any external file dependencies, relative pathing will not work.  They need to be bundled along with the mobile client as part of its assets.  
+[! **might need to insert some explanation here or link** !]
 
 In Android, the location is `file:///android_asset/`.  On iOS, it is up to how you set up your Xcode project, but I have it under an `assets` folder.
 
@@ -225,10 +226,8 @@ remotePut: function(key, value) {
 ...
 ```
 
-A few things to note here, the first thing we just want to get out of the way:
-
 #### 1. Why can't we just use localStorage as in regular WebJS??
-window.localStorage is still very much a thing, and can be something you make use of *as long as you only need it during the current session*.  If you require access to the keys and values in a subsequent session, the data will no longer be accessible.  <*might need to insert some explanation here or link*>
+window.localStorage is still very much a thing, and can be something you make use of *as long as you only need it during the current session*.  If you require access to the keys and values in a subsequent session, the data will no longer be accessible.  [! **might need to insert some explanation here or link** !]
 
 #### 2. Calling `window.postMessage` will take care of sending your message to the React Native side.
 The object you use to wrap your data to fire over the bridge is up your imagination, as long as it can be sent as a string.  The first parameter is your stringified object data, and the second parameter is a mandatory field to specify where the message is originating from, in order to allow for validating on the receiving end and protect against malicious attacks.  In this case `'*'` is a wildcard key, meaning it's coming from a generic/unspecified location.  It will be up to the receiver to decide if the message is acceptable or not.
@@ -256,16 +255,75 @@ remoteGet: function(key) {
 #### FetchPromiseSwitchboard
 The Fetch Promise Switchboard is where key requests are mapped to response callbacks.  Why do we need this?  Because the action of contacting React Native, asking them to do a look up of our key in AsyncStorage, and catching the value on the return is a fire-and-receive-later kind of operation.  There is no convenient callback we can hook into, like an actual API with a response.  The WebView event model follows a Broadcast pattern.  Therefore, when we post a message with our fetch request, the response will be returning through a different event.  And when the fetch successfully returns, we need some way to associate the key that was fetched by React Native with "resolve" and "reject" callbacks established during the original call.
 
-As an analogy, think of applying for a new passport.  The first visit to the Passport Office will be you filling out forms, and documents, and then you're told you will receive your passport at a later date.  You pass on your contact info, like your home address.  When the passport is ready, the officer will match your passport to the address details you left, and mail out your passport to you.  So when you receive it days later, you will be all fine and dandy for the next getaway to Bali.
+As an analogy, think of ordering a package on Amazon.  You decide what you want, put in your order, and then you're told you will receive a package at a later date.  You pass on your contact info to Amazon, and it is stored and associated with your order number.  When your package is ready, the deliver service will do a lookup of your order, fetch your address, and mail out your package to you.
 
 ```
- handleGet: function(key, value)
+ handleGet: function(key, value) {
+    if ( window.fetchPromiseSwitchboard[key] && window.fetchPromiseSwitchboard[key].resolve)
     {
-        if ( window.fetchPromiseSwitchboard[key] && window.fetchPromiseSwitchboard[key].resolve)
-        {
-            window.fetchPromiseSwitchboard[key].resolve(value);
-            delete window.fetchPromiseSwitchboard[key];
-        }
-    },
+        window.fetchPromiseSwitchboard[key].resolve(value);
+        delete window.fetchPromiseSwitchboard[key];
+    }
+},
 ```
-`handleGet` is the passport officer doing the lookup of your address to pass on your new shiny passport.  It checks if the key matches any of the switchboard requests made previously, as it's not at all unfeasible to imagine someone else applying to get their passport at the same time as you.  You won't know when theirs is ready, even if you already know yours - everyone is closely tied to their accounts.
+`handleGet` is the deliveryman doing the lookup of your address to pass on your purchased item.  It checks if the key matches any of the switchboard requests made previously, as it's not at all unfeasible to imagine someone ordering a different package at the same time as you.  You won't know when theirs is ready, even if you know yours - each person's journey is their own.
+
+### You Wanna Bridge-it, Bridge-it (bridge.html)
+
+It's less important what happens in the front-end html/css side of things in this class, so we will only discuss the Javascript that forms the actual bridge.
+
+```
+function saveToLocalStorage(){
+    var key = document.getElementById("key").value;
+    var value = document.getElementById("value").value;
+
+    //We don't want to save any empty values
+    if (!key || !value)
+        return;
+
+    //Call our web storage to save our value wih the provided key
+    window.storage.remotePut(key, value);
+    //Tell our users what's up
+    window.document.getElementById("storageStatus").innerHTML = "Adding new code!";
+    //Clear out the value input field so when we test the fetch, it can populate it
+    document.getElementById("value").value = "";
+}
+```
+Saving is fairly straightforward - here we have a function that is called from a button in our WebView that makes a request to store our specified values in "key" and "value" and we simply call `window.storage.remotePut(key, value)`, which calls into the functionality in storage.js.
+
+```
+function fetch()
+{
+    //Grab the value from the key input field
+    var key = document.getElementById("key").value;
+    //Make the request to get from our web storage
+    
+    window.storage.remoteGet(key).then(function(result){
+        window.document.getElementById("storageStatus").innerHTML = "Results fetched from React Native AsyncStorage:";
+        document.getElementById("value").value = result;
+    }, function(error){
+        window.document.getElementById("storageStatus").innerHTML = error;
+    });
+}
+```
+Fetching is also the same, where it makes the fetch request via `window.storage.remoteGet(key)`, which as we recall returns a promise.  Given that, we can set up our resolve and reject callbacks when the fetch eventually comes through.
+
+The final piece is dealing with catching the fetch response from React Native, which comes through as a WebView "message" event.
+
+```
+window.document.addEventListener("message", function(event) {
+    var eventData = JSON.parse(event.data);
+    switch(eventData.id)
+    {
+        case "storageGet":
+            var getData = JSON.parse(eventData.data);
+            if (getData)
+            {
+                window.storage.handleGet(getData.key, getData.value);
+            }
+            return;
+    }
+}, false);
+```
+
+Here, we simply add a listener to the "message" event, handle the data from React Native, and pop it through to `window.storage.handleGet` to hit up the FetchPromiseSwitchboard and call the appropriate callbacks.  This is when the second half of the call to `window.storage.remoteGet(key)` from the code block above is executed.  Incoming package!

@@ -1,5 +1,5 @@
 # Webview-ReactNativeStorage-Demo
-How-to guide for setting up a Webview to save and retrieve from React Native AsyncStorage.
+How-To guide for setting up a Webview to save and retrieve from React Native AsyncStorage.
 
 <img src="./IMG_6438.PNG" width="300">
 
@@ -21,14 +21,14 @@ This project also assumes you are familiar with [WebJS](https://www.w3schools.co
 
 #### Why did Algernon's Lab decide to share this with the world?
 (short)
-While developing Algernon, we discovered that there was no thorough tutorial or demo out there explaining how to save to local storage from a webview...until now!  After building this out in our own project, we wanted to share how we did it in order to start the conversation and help out any other groups who may be encountering the same issue.
+While developing Algernon, we discovered that there was no thorough tutorial or demo out there explaining how to save to local storage from an embedded webview...until now!  After building this out in our own project, we wanted to share how we did it in order to start the conversation and help out any other groups who may be encountering the same issue.
 
 (long)
-While developing Algernon, we made the big, but very necessary, decision to implement End-to-end Encryption (also known as [E2EE](https://en.wikipedia.org/wiki/End-to-end_encryption) - I know, we're sorry about linking to Wikipedia).  At the time, we had built Algernon on a [MEAN](http://mean.io/) stack, and the available solutions for chat encryption on web, such as [libsodium](https://github.com/jedisct1/libsodium), did not truly offer us the end-to-end experience we were looking for.  This led us to discovering the [Signal Protocol](https://signal.org/docs/), developed by Open Whisper Systems, [who even did the encryption work for the heavyweight chat application Whatsapp](https://signal.org/blog/whatsapp-complete/).  Best of all, not only is all their code open-source, they offer support for Desktop, mobile iOS and Android.
+While developing Algernon, we made the big, but very necessary, decision to implement End-to-end Encryption (also known as [E2EE](https://en.wikipedia.org/wiki/End-to-end_encryption)).  At the time, we had built Algernon on a [MEAN](http://mean.io/) stack, and the available solutions for chat encryption on web, such as [libsodium](https://github.com/jedisct1/libsodium), did not truly offer us the end-to-end experience we were looking for.  This led us to discovering the [Signal Protocol](https://signal.org/docs/), developed by Open Whisper Systems, [who even did the encryption work for the heavyweight chat application Whatsapp](https://signal.org/blog/whatsapp-complete/).  Best of all, not only is all their code open-source, they offer support for Desktop, mobile iOS and Android.
 
-We had always intended Algernon to be on the mobile platform, but went with a browser-based app first just to get things up and running quicker.  We wanted to hit both iOS and Android, but didn't have the manpower to build multiple native-specific codebases, so React Native came to the rescue, with the promise of hitting both platforms at once under a common ReactJS codebase.  However, adding the JavaScript libsignal-protocol library to our project was not as simple as we thought, and through many trials and tribulations, landed on a solution that involved using a Webview to form a bridge between Signal's nifty encryption capabilities and our React Native frontend.
+We had always intended Algernon to be on the mobile platform, but went with a browser-based app first just to get things up and running quicker.  We wanted to run on both iOS and Android, but lacked the manpower to build two native-specific clients - React Native came to the rescue, with the promise of hitting both platforms at once under a common ReactJS codebase.  However, adding the JavaScript libsignal-protocol library to our project was not as simple as we thought, and through many trials and tribulations, landed on a solution that involved using a WebView to form a bridge between Signal's nifty encryption capabilities and our React Native frontend.
 
-While working on this web-bridge solution, we discovered that all the web code that relied on LocalStorage didn't persist between sessions (more on this later).  As of now, there does not seem to be a way to save to native device storage directly from a React Native WebView.  After scouring the deep recesses of the Internets, a WebView bridge seemed like the only way.  However, there was no thorough tutorial or demo out there explaining how to achieve this...until now!  After constructing our local storage bridge, we wanted to share how we did it in order to start the conversation and help out any other groups who may be encountering the same issue.
+While working on this web-to-react bridge solution, we discovered that all the web code that relied on LocalStorage didn't persist between sessions (more on this later).  As of now, there does not seem to be a way to save to native device storage directly from a React Native WebView.  After scouring the deep recesses of the Internets, a WebView bridge seemed like the only way.  However, there was no thorough tutorial or demo out there explaining how to achieve this...until now!  After constructing our local storage bridge, we wanted to share how we did it in order to start the conversation and help out any other groups who may be encountering the same issue.
 
 
 ## Project Structure
@@ -78,7 +78,7 @@ export default class Storage
 }
 ```
 
-One thing to keep in mind is that AsyncStorage methods are as the class name suggests - async.  So each will return a [promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise), and either resolve if the operation was successful, or be rejected if something went wrong.  I decided to just pass this promise along in order to allow the main class to handle success/fail on their own.  It also doesn't hide that the operation is asynchronous.
+One thing to keep in mind is that AsyncStorage methods are as the class name suggests - asynchronous.  So each will return a [promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise), and either resolve if the operation was successful, or be rejected if something went wrong.  We willl just pass this promise along in order to allow the main class to handle success/fail on their own.  It also doesn't hide that the operation is asynchronous.
 
 ## Step 2 - Creating a WebView in React Native (App.js)
 
@@ -133,11 +133,11 @@ export default class App extends React.Component
 You may have noticed that in the source of our webview, there are three distinct cases - dev, ios and android.  The reason why our bridge class needs to be handled differently on each platform is because although a single HTML file is totally fine to be bundled with your Expo project, if you plan to have any included JavaScript, CSS, or any external file dependencies, relative pathing will not work.  They need to be bundled along with the mobile client as part of its assets.  
 [! **might need to insert some explanation here or link** !]
 
-In Android, the location is `file:///android_asset/`.  On iOS, it is up to how you set up your Xcode project, but I have it under an `assets` folder.
+In Android, the location is `file:///android_asset/`.  On iOS, it is up to how you set up your Xcode project, but here we have it under an `assets` folder.
 
 You can get around this by embedding all your CSS and JavaScript into the HTML file so no special cases are necessary, but if you have a significant amount of code to drive our WebView, you'll likely want to have the freedom of organization for your own sanity.   The drawback is that you won't be able to update your WebView content live.
 
-#### The Webview Event Handlers
+#### The WebView Event Handlers
 
 The WebView has a few built in events you can add callbacks to, in order to trigger certain actions.
 
@@ -195,11 +195,11 @@ Practice: The "remove" action is missing from the switch above - add an implemen
 
 ## Step 3 - Creating The Bridge
 
-Now that we've laid down the groundwork on the React Native side, it's time to set up a magic bridge that will grant a humble Webview the ability to save its data to local, native storage (OK, it's not really magic).
+Now that we've laid down the groundwork on the React Native side, it's time to set up the magic bridge that will grant a humble Webview the ability to save its data to native storage (OK, it's not really magic).
 
-### Webview's Storage (storage.js)
+### WebView's Storage (storage.js)
 
-Before we dive into the meat of it, let's get a simple storage class set up, that will mirror what we have on the React Native side, but will serve as kind of the "API" to React Native.  Here we will "post" requests to React Native with our storage requests.
+Before we dive into the meat of it, let's get a simple storage class set up that will mirror what we have on the React Native side, while serving as sort of the "API" to React Native.  Here we will "post" requests to React Native with our storage requests.
 
 ```
 ...
@@ -253,9 +253,9 @@ remoteGet: function(key) {
 `remoteGet` follows the same pattern as `remotePut`, with one marked difference - it returns a Promise, which stores its resolve and reject callbacks to something called the `window.fetchPromiseSwitchboard`.  What the heck is that?
 
 #### FetchPromiseSwitchboard
-The Fetch Promise Switchboard is where key requests are mapped to response callbacks.  Why do we need this?  Because the action of contacting React Native, asking them to do a look up of our key in AsyncStorage, and catching the value on the return is a fire-and-receive-later kind of operation.  There is no convenient callback we can hook into, like an actual API with a response.  The WebView event model follows a Broadcast pattern.  Therefore, when we post a message with our fetch request, the response will be returning through a different event.  And when the fetch successfully returns, we need some way to associate the key that was fetched by React Native with "resolve" and "reject" callbacks established during the original call.
+The Fetch Promise Switchboard is basically like a hashtable where key requests are mapped to response callbacks.  Why do we need this?  Because the action of contacting React Native, asking them to do a look up of our key in AsyncStorage, and catching the value on the return is a fire-and-receive-later kind of operation.  There is no convenient callback we can hook into, like an actual API with a response.  The WebView event model follows a Broadcast pattern.  Therefore, when we post a message with our fetch request, the response will be returning through a different event.  And when the fetch successfully returns, we need some way to associate the key that was fetched by React Native with "resolve" and "reject" callbacks established during the original call.
 
-As an analogy, think of ordering a package on Amazon.  You decide what you want, put in your order, and then you're told you will receive a package at a later date.  You pass on your contact info to Amazon, and it is stored and associated with your order number.  When your package is ready, the deliver service will do a lookup of your order, fetch your address, and mail out your package to you.
+As an analogy, think of ordering a package on Amazon.  You decide what you want, put in your order, and then you're told you will receive a package at a later date.  You pass on your contact information to Amazon, and it is stored and associated with your order number.  Only when your package is ready, the delivery service will do a lookup of your order, fetch your address, and mail out your package to you.
 
 ```
  handleGet: function(key, value) {
@@ -266,7 +266,7 @@ As an analogy, think of ordering a package on Amazon.  You decide what you want,
     }
 },
 ```
-`handleGet` is the deliveryman doing the lookup of your address to pass on your purchased item.  It checks if the key matches any of the switchboard requests made previously, as it's not at all unfeasible to imagine someone ordering a different package at the same time as you.  You won't know when theirs is ready, even if you know yours - each person's journey is their own.
+`handleGet` is the deliveryman doing the lookup of your address to pass on your purchased item.  It checks if the key matches any of the switchboard requests made previously, as it's not at all unfeasible to imagine someone ordering a different package at around the same time as you.  The order in which these requests are fulfilled is variable, so a hashtable offers a convenient look up strategy.
 
 ### You Wanna Bridge-it, Bridge-it (bridge.html)
 
@@ -326,4 +326,6 @@ window.document.addEventListener("message", function(event) {
 }, false);
 ```
 
-Here, we simply add a listener to the "message" event, handle the data from React Native, and pop it through to `window.storage.handleGet` to hit up the FetchPromiseSwitchboard and call the appropriate callbacks.  This is when the second half of the call to `window.storage.remoteGet(key)` from the code block above is executed.  Incoming package!
+Here, we simply add a listener to the "message" event, handle the data from React Native, and pop it through to `window.storage.handleGet` to hit up the FetchPromiseSwitchboard and call the appropriate callbacks.  This is when the second half of the call to `window.storage.remoteGet(key)` from the code block above is executed.  
+
+Incoming package!

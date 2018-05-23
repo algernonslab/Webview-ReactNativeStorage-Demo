@@ -2,11 +2,11 @@
 How-To guide for setting up a Webview to save and retrieve from React Native AsyncStorage.
 
 
-<img src="./images/IMG_6438.PNG" width="300"> | <img src="./images/IMG_6440.PNG" width="300"> 
+<img src="./images/setup.PNG" width="300"> | <img src="./images/savekey.PNG" width="300"> 
 ------------ | ------------- 
 React Native on top, WebView on the bottom. | Saving a new key and value to AsyncStorage.
 
-<img src="./images/IMG_6442.PNG" width="300"> | <img src="./images/IMG_6444.PNG" width="300">
+<img src="./images/fetchcode.PNG" width="300"> | <img src="./images/fetchnew.PNG" width="300">
 ------------ | ------------- 
 Retrieving from AsyncStorage in same session. | Retrieving from AsyncStorage in new session.
 

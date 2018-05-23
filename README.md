@@ -20,23 +20,15 @@ This is a guide on how you can save data to React Native's AsyncStorage, even wh
 - A [WebView](https://facebook.github.io/react-native/docs/webview.html) is used to display web content within your React Native project.
 
 #### What do I need to know before reading this guide?
-This demo assumes you have working knowledge of React Native, you have already set up your own project and built and run your React Native application.  This GitHub does not include all the script necessary to make builds or run on Expo, mostly because React Native requires ~300MB of components in node_modules, which you should have in your own project already.
+This demo assumes you have working knowledge of React Native, you have already set up your own project and built and run your React Native application.  This GitHub does not include all the scripts necessary to make builds or run on Expo, mostly because React Native requires ~300MB of components in node_modules, which you should have in your own project already.
 
 If you are new to React Native, no better place to start than in their own [documentation](https://facebook.github.io/react-native/docs/getting-started.html)!
 
 This project also assumes you are familiar with [WebJS](https://www.w3schools.com/js/default.asp), [HTML](https://www.w3schools.com/html/), and [CSS](https://www.w3schools.com/css/).  If you're new to web development or just need a refresher, hit up the links to get some quality W3 schooling.
 
 #### Why did Algernon's Lab decide to share this with the world?
-(short)
-While developing Algernon, we discovered that there was no thorough tutorial or demo out there explaining how to save to local storage from an embedded webview...until now!  After building this out in our own project, we wanted to share how we did it in order to start the conversation and help out any other groups who may be encountering the same issue.
 
-(long)
-While developing Algernon, we made the big, but very necessary, decision to implement End-to-end Encryption (also known as [E2EE](https://en.wikipedia.org/wiki/End-to-end_encryption)).  At the time, we had built Algernon on a [MEAN](http://mean.io/) stack, and the available solutions for chat encryption on web, such as [libsodium](https://github.com/jedisct1/libsodium), did not truly offer us the end-to-end experience we were looking for.  This led us to discovering the [Signal Protocol](https://signal.org/docs/), developed by Open Whisper Systems, [who even did the encryption work for the heavyweight chat application Whatsapp](https://signal.org/blog/whatsapp-complete/).  Best of all, not only is all their code open-source, they offer support for Desktop, mobile iOS and Android.
-
-We had always intended Algernon to be on the mobile platform, but went with a browser-based app first just to get things up and running quicker.  We wanted to run on both iOS and Android, but lacked the manpower to build two native-specific clients - React Native came to the rescue, with the promise of hitting both platforms at once under a common ReactJS codebase.  However, adding the JavaScript libsignal-protocol library to our project was not as simple as we thought, and through many trials and tribulations, landed on a solution that involved using a WebView to form a bridge between Signal's nifty encryption capabilities and our React Native frontend.
-
-While working on this web-to-react bridge solution, we discovered that all the web code that relied on LocalStorage didn't persist between sessions (more on this later).  As of now, there does not seem to be a way to save to native device storage directly from a React Native WebView.  After scouring the deep recesses of the Internets, a WebView bridge seemed like the only way.  However, there was no thorough tutorial or demo out there explaining how to achieve this...until now!  After constructing our local storage bridge, we wanted to share how we did it in order to start the conversation and help out any other groups who may be encountering the same issue.
-
+While developing Algernon, in attempting to integrate a webJS library, we realized the only place this library would work for us was behind a WebView.  However, after scouring the deep recesses of the Internet, there seemed to be no tutorial or demo out there explaining how to save to native storage from an embedded webview...until now!  After building this out in our own project, we wanted to share our implementation in order to start the conversation and help out any other groups who may be encountering the same issue.
 
 ## Project Structure
 
@@ -137,8 +129,7 @@ export default class App extends React.Component
 }
 ...
 ```
-You may have noticed that in the source of our webview, there are three distinct cases - dev, ios and android.  The reason why our bridge class needs to be handled differently on each platform is because although a single HTML file is totally fine to be bundled with your Expo project, if you plan to have any included JavaScript, CSS, or any external file dependencies, relative pathing will not work.  They need to be bundled along with the mobile client as part of its assets.  
-[! **might need to insert some explanation here or link** !]
+You may have noticed that in the source of our webview, there are three distinct cases - dev, ios and android.  The reason why our bridge class needs to be handled differently on each platform is because although a single HTML file is totally fine to be bundled with your Expo project, if you plan to have any included JavaScript, CSS, or any external file dependencies, relative pathing will not work.  They need to be [bundled along with the mobile client as part of its assets](https://github.com/facebook/react-native/issues/16133).
 
 In Android, the location is `file:///android_asset/`.  On iOS, it is up to how you set up your Xcode project, but here we have it under an `assets` folder.
 
@@ -216,7 +207,7 @@ remotePut: function(key, value) {
 
     //----------------------------------------------------------------
     // Why can't we just call localStorage from the webview side??
-    //localStorage.setItem("" + key, textsecure.utils.jsonThing(value));
+    // localStorage.setItem("" + key, textsecure.utils.jsonThing(value));
     //----------------------------------------------------------------
 
     var msgObj = 
@@ -234,7 +225,7 @@ remotePut: function(key, value) {
 ```
 
 #### 1. Why can't we just use localStorage as in regular WebJS??
-window.localStorage is still very much a thing, and can be something you make use of *as long as you only need it during the current session*.  If you require access to the keys and values in a subsequent session, the data will no longer be accessible.  [! **might need to insert some explanation here or link** !]
+window.localStorage is still very much a thing, and can be something you make use of *as long as you only need it during the current session*.  If you require access to the keys and values in a subsequent session, [the data will no longer be accessible](https://stackoverflow.com/questions/38319948/persistent-storage-for-react-native-webview).
 
 #### 2. Calling `window.postMessage` will take care of sending your message to the React Native side.
 The object you use to wrap your data to fire over the bridge is up your imagination, as long as it can be sent as a string.  The first parameter is your stringified object data, and the second parameter is a mandatory field to specify where the message is originating from, in order to allow for validating on the receiving end and protect against malicious attacks.  In this case `'*'` is a wildcard key, meaning it's coming from a generic/unspecified location.  It will be up to the receiver to decide if the message is acceptable or not.
@@ -336,3 +327,9 @@ window.document.addEventListener("message", function(event) {
 Here, we simply add a listener to the "message" event, handle the data from React Native, and pop it through to `window.storage.handleGet` to hit up the FetchPromiseSwitchboard and call the appropriate callbacks.  This is when the second half of the call to `window.storage.remoteGet(key)` from the code block above is executed.  
 
 Incoming package!
+
+## Conclusion
+
+In this tutorial, we went over how to work with AsyncStorage, set up a Webview, create a bridge between React Native and WebJS, and handle fetching and receiving asychronous messages from React Native in the WebView space.  Now we have the ability to freely save and load our data with the knowledge that we are taking full advantage of native storage, even within our WebView code.  
+
+We're looking forward to contributing as much as we've already received from the React Native community, so please give us feedback on how this tutorial can be improved, or suggestions on other topics that may be of interest at <algernonslab@gmail.com>.
